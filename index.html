@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Excel Pre-Assessment (Sets A → C) + Radar + Word Export</title>
+  <title>Excel Pre-Assessment (Sets A → C) + Radar + Google Sheet Submit</title>
   <style>
     :root{
       --bg:#0b1220;
@@ -131,12 +131,10 @@
   <h1>Microsoft Excel Pre-Assessment (Sets A → C)</h1>
   <p class="sub">
     10-minute diagnostic. Auto-interprets candidate level and recommends training enrollment level.
-    Includes a radar chart (strengths/weaknesses) and Word export.
   </p>
 </header>
 
 <div class="wrap">
-  <!-- MAIN -->
   <main class="card">
     <div class="panelTitle">
       <span id="stepTitle">Start</span>
@@ -148,7 +146,6 @@
 
     <div class="progressBar"><div id="progressFill"></div></div>
 
-    <!-- START SCREEN -->
     <div id="screenStart" class="qblock">
       <p class="hint">
         This assessment has three stages: <b>Set A</b> (experience), <b>Set B</b> (tool recognition), <b>Set C</b> (advanced thinking).
@@ -183,10 +180,8 @@
       </div>
     </div>
 
-    <!-- QUESTIONS -->
     <div id="questionHost" class="hidden"></div>
 
-    <!-- RESULTS -->
     <div id="screenResult" class="hidden">
       <div class="qblock">
         <p class="qtitle">Result Summary</p>
@@ -241,35 +236,30 @@
 
         <div class="hr"></div>
 
-        <p class="qtitle">Interpretation</p>
-        <ul class="list" id="interpretList"></ul>
-
-        <div class="hr"></div>
-
         <p class="qtitle">Recommendation</p>
         <p class="hint" id="recommendationText"></p>
+        <ul class="list" id="interpretList"></ul>
 
         <div class="cta">
-          <button class="primary" id="btnDownload">Download Result (JSON)</button>
-          <button class="ghost" id="btnDownloadWord">Download Result (Word .doc)</button>
-          <button class="ghost" id="btnCopy">Copy Summary</button>
+          <button class="primary" id="btnUpload" style="background:#4285F4; color:white">Submit</button>
+          
+          <button class="ghost" id="btnDownload">Download (JSON)</button>
+          <button class="ghost" id="btnDownloadWord">Download (Word .doc)</button>
           <button class="danger" id="btnReset">Reset</button>
         </div>
 
         <div class="footerNote">
-          Word export uses a Word-compatible HTML (.doc) format and opens cleanly in Microsoft Word.
+          Submitting sends your result to the central database. You can also download a copy for your records.
         </div>
       </div>
     </div>
 
-    <!-- NAV -->
     <div class="btnRow hidden" id="navButtons">
       <button class="ghost" id="btnBack">Back</button>
       <button class="primary" id="btnNext">Next</button>
     </div>
   </main>
 
-  <!-- SIDE -->
   <aside class="card">
     <div class="panelTitle">
       <span>Trainer Dashboard</span>
@@ -292,7 +282,7 @@
     </div>
 
     <p class="footerNote">
-      Save as <span class="mono">excel-assessment-radar-word.html</span> and open in any modern browser. Works offline.
+      Save as <span class="mono">excel-assessment.html</span> and open in any modern browser.
     </p>
   </aside>
 </div>
@@ -325,15 +315,15 @@ const QUESTION_SETS = [
         title: "Which of the following have you personally done in Excel?",
         hint: "Select all that apply.",
         options: [
-          "Enter and format data neatly (alignment, borders, number formats)",  //0
-          "Use basic formulas (SUM, AVERAGE, COUNT)",                           //1
-          "Use IF formulas",                                                   //2
-          "Use VLOOKUP or XLOOKUP",                                            //3
-          "Sort and filter data",                                              //4
-          "Convert data into Excel Tables",                                    //5
-          "Create PivotTables",                                                //6
-          "Create charts from data",                                           //7
-          "Clean data (remove duplicates, split text, fix inconsistent formats)" //8
+          "Enter and format data neatly (alignment, borders, number formats)",
+          "Use basic formulas (SUM, AVERAGE, COUNT)",
+          "Use IF formulas",
+          "Use VLOOKUP or XLOOKUP",
+          "Sort and filter data",
+          "Convert data into Excel Tables",
+          "Create PivotTables",
+          "Create charts from data",
+          "Clean data (remove duplicates, split text, fix inconsistent formats)"
         ],
         score: (ans) => Array.isArray(ans) ? ans.length : 0,
         max: 9
@@ -394,7 +384,7 @@ function toast(msg){
   const t = el("toast");
   t.textContent = msg;
   t.classList.add("show");
-  setTimeout(()=>t.classList.remove("show"), 1600);
+  setTimeout(()=>t.classList.remove("show"), 2000);
 }
 function fmtTime(sec){
   const m = Math.floor(sec / 60), s = sec % 60;
@@ -923,6 +913,15 @@ function resetAll(){
   el("liveEstimate").textContent="—";
   showScreen("start");
   toast("Reset complete.");
+  
+  // Reset Upload Button
+  const btn = el("btnUpload");
+  if(btn){
+    btn.textContent = "Submit to HR";
+    btn.disabled = false;
+    btn.style.background = "#4285F4";
+    btn.style.color = "white";
+  }
 }
 
 /* =========================
@@ -957,33 +956,6 @@ function downloadJSON(){
   a.click();
   a.remove();
   setTimeout(()=>URL.revokeObjectURL(url), 1000);
-}
-
-async function copySummary(){
-  const p = buildExportPayload();
-  const s = p.scores;
-  const lvl = p.interpretation.overallLevel;
-  const rec = p.interpretation.recommendation;
-  const radarLine = RADAR_AXES.map(ax => `${ax.label}:${p.radar[ax.key]}/5`).join(" | ");
-
-  const text =
-`Excel Pre-Assessment Result
-Participant: ${p.meta.name}
-Department: ${p.meta.dept}
-Role: ${p.meta.role}
-Overall Level: ${lvl}
-Total Score: ${s.total}/${s.maxTotal}
-Set A: ${s.aScore}/${s.aMax} | Set B: ${s.bScore}/${s.bMax} | Set C: ${s.cScore}/${s.cMax}
-Confidence: ${s.confSummary}
-
-Strength Radar (0–5):
-${radarLine}
-
-Recommended Enrollment: ${rec.enroll}
-Focus: ${rec.focus.join("; ")}
-Trainer Note: ${rec.caution}${rec.edge ? " " + rec.edge : ""}`;
-  try{ await navigator.clipboard.writeText(text); toast("Summary copied to clipboard."); }
-  catch(e){ toast("Copy failed. Your browser may block clipboard access."); }
 }
 
 function downloadWordDoc(){
@@ -1103,6 +1075,47 @@ function loadDemo(){
 }
 
 /* =========================
+   GOOGLE SHEETS INTEGRATION
+========================= */
+// TODO: Replace this URL with your actual "Web App URL" from Google Sheets > Extensions > Apps Script > Deploy
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzOoHZ0pVxmhGqW1LifR2caadkL5eDD5EDn3YSqt9OkIBU-fTRm-fAXbIX_DxT0OGm_/exec"; 
+
+async function uploadResult() {
+  const btn = el("btnUpload");
+  const originalText = btn.textContent;
+  
+  // Visual feedback
+  btn.textContent = "Sending...";
+  btn.disabled = true;
+
+  const payload = buildExportPayload();
+
+  try {
+    // We use no-cors to allow the browser to send data to Google from a local file.
+    // In this mode, we cannot read the response, but if no error is thrown, it worked.
+    await fetch(GOOGLE_SCRIPT_URL, {
+      method: "POST",
+      mode: "no-cors", 
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8",
+      },
+      body: JSON.stringify(payload)
+    });
+
+    toast("Result submitted to HR successfully!");
+    btn.textContent = "Submitted";
+    btn.style.background = "#3ddc97"; // Success Green
+    btn.style.color = "#0b1220";
+    
+  } catch (error) {
+    console.error(error);
+    toast("Connection failed. Please use Download instead.");
+    btn.textContent = originalText;
+    btn.disabled = false;
+  }
+}
+
+/* =========================
    INIT
 ========================= */
 buildFlatQuestions();
@@ -1123,7 +1136,11 @@ el("btnBack").addEventListener("click", ()=>back());
 el("btnReset").addEventListener("click", ()=>resetAll());
 el("btnDownload").addEventListener("click", ()=>downloadJSON());
 el("btnDownloadWord").addEventListener("click", ()=>downloadWordDoc());
-el("btnCopy").addEventListener("click", ()=>copySummary());
+
+// Bind new Upload Button
+if(el("btnUpload")){
+  el("btnUpload").addEventListener("click", ()=>uploadResult());
+}
 
 window.addEventListener("beforeunload",(e)=>{
   if (APP.meta.startedAt && !APP.meta.endedAt){
